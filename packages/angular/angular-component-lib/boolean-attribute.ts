@@ -33,7 +33,7 @@
  * transforms statically when compiling a library in partial compilation mode.
  *
  * This lives in its own file, separate from `utils.ts`, so that it carries no runtime imports.
- * That keeps it independently type-checkable without pulling `rxjs` in for `proxyOutputs`.
+ * That keeps it independently type-checkable without pulling in any event-handling runtime.
  */
 export function nullableBooleanAttribute(value: boolean | string | null | undefined): boolean | null | undefined {
   if (value === null || value === undefined) {

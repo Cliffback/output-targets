@@ -34,6 +34,13 @@ function createPropertyDeclaration(
 }
 
 /**
+ * Converts an event name into the identifier used by the generated Angular wrapper.
+ * Angular output metadata can alias that identifier back to the DOM event name.
+ */
+const toOutputPropertyName = (eventName: string) =>
+  eventName.replace(/[-/]+([a-zA-Z0-9_$])/g, (_, character) => character.toUpperCase());
+
+/**
  * The transform function to reference in generated code, exported from
  * `angular-component-lib/boolean-attribute`.
  */
@@ -93,7 +100,12 @@ export const createAngularComponentDefinition = (
 ) => {
   const tagNameAsPascal = dashToPascalCase(tagName);
 
-  const outputs = events.filter((event) => !event.internal).map((event) => event.name);
+  const outputs = events
+    .filter((event) => !event.internal)
+    .map((event) => {
+      const propertyName = toOutputPropertyName(event.name);
+      return propertyName === event.name ? propertyName : `${propertyName}: ${event.name}`;
+    });
 
   const hasInputs = inputs.length > 0;
   const hasOutputs = outputs.length > 0;
@@ -138,9 +150,9 @@ export const createAngularComponentDefinition = (
   const outputDeclarations = events
     .filter((event) => !event.internal)
     .map((event) => {
-      const camelCaseOutput = event.name.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
+      const outputPropertyName = toOutputPropertyName(event.name);
       const outputType = `EventEmitter<${tagNameAsPascal}CustomEvent<${formatOutputType(tagNameAsPascal, event)}>>`;
-      return `@Output() ${camelCaseOutput} = new ${outputType}();`;
+      return `@Output() ${outputPropertyName} = new ${outputType}();`;
     });
 
   const propertiesDeclarationText = [
@@ -155,6 +167,8 @@ export const createAngularComponentDefinition = (
    * Angular does not complain about the inputs property. The output target
    * uses the inputs property to define the inputs of the component instead of
    * having to use the @Input decorator (and manually define the type and default value).
+   * - Output bindings receive the native CustomEvent from the web component. The declared
+   *   EventEmitter is for Angular metadata and typing; emitting from it would deliver events twice.
    */
   const output = `@ProxyCmp({${proxyCmpOptions.join(',')}\n})
 @Component({
@@ -278,7 +292,7 @@ export const createComponentTypeDefinition = (
   });
   const eventTypes = publicEvents.map((event) =>
     createPropertyDeclaration(
-      event,
+      { ...event, name: toOutputPropertyName(event.name) },
       `EventEmitter<${tagNameAsPascal}CustomEvent<${formatOutputType(tagNameAsPascal, event)}>>`
     )
   );
